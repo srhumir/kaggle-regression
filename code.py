@@ -148,10 +148,41 @@ importance_plot(np.append(chooses1,chooses2), np.append(cv_err1, cv_err2, axis=0
 ########### The number of important values is 97 considering trade-off between std and mean error
 choose = 97
 impvars = indices[:choose]
-
-rf.fit(X_train.iloc[:, impvars], loss_train)
+train_data = X_train.iloc[:, impvars]
+rf.fit(train_data, loss_train)
 x =np.where(np.array(chooses2) == (choose-1))
 print("Error = %i +/- %i" %(-cv_err2[x,:].mean(), int(2*cv_err2.std())))
 print("R-squired = %f" 
-      %metrics.r2_score(loss_train, rf.predict(X_train.iloc[:, impvars])))
+      %metrics.r2_score(loss_train, rf.predict(train_data)))
 
+# Neural network
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.wrappers.scikit_learn import KerasRegressor
+def nn_model():
+	# create model
+	model = Sequential()
+	model.add(Dense(20, input_dim=impvars.size, init='normal', 
+                 activation='relu'))
+	model.add(Dense(1, init='normal'))
+	# Compile model
+	model.compile(loss='mean_squared_error', optimizer='adam')
+	return model
+# fix random seed for reproducibility
+seed = 7
+np.random.seed(seed)
+
+nn = KerasRegressor(build_fn=nn_model, nb_epoch=200, batch_size=5,
+                           verbose=1) 
+nn.fit(train_data.values, loss_train,
+       validation_split=0.1,
+       show_accuracy=True)
+nn_time = time.time()-t0_nn
+t0_nn= time.time()
+nn_err = cv.cross_val_score(estimator=nn,
+                            X=train_data.values,
+                            y=loss_train,
+                            scoring = 'mean_absolute_error',
+                            cv=4,
+                            n_jobs=-1)
+nn_time = time.time()-t0
