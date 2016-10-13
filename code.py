@@ -91,50 +91,67 @@ for f in range(50):
 #    val_err.append(math.sqrt(metrics.mean_squared_error(loss_val,rf.predict(X_val_std[:, impvars]))))
 chooses = [int(X_train.shape[1]/40)*i for i in range(42)]
 def check_imp(chooses, rfmodel, X_train, y_train, indices):
-    train_err = []
     cv_err =[]
     t0_featselec = time.time()
     for choose in chooses:
         impvars = indices[:choose+1]
-        err = cv.cross_val_score(estimator=rf,
-                          X=X_train.iloc[:,impvars],
-                          y=loss_train,
+        err = cv.cross_val_score(estimator=rfmodel,
+                                 X=X_train.iloc[:,impvars],
+                                 y=y_train,
                           scoring = 'mean_absolute_error',
                           cv=5,
                           n_jobs=-1)
-    cv_err.append(err)
-    print(choose)
-    print('So far %d seconds' %(time.time() - t0_featselec))
-print('Total time: %d seconds' %(time.time()-t0_featselec))
+        cv_err.append(err)
+        print(choose)
+        print('So far %d seconds' %(time.time() - t0_featselec))
+    print('Total time: %d seconds' %(time.time()-t0_featselec))
+    return(np.array(cv_err))
 
-cv_err = np.array(cv_err)
-fig=plt.figure(figsize=(10,10))
-plt.subplot()
-plt.plot(chooses, -cv_err.mean(axis=1),
-         color='blue', marker='o',
-         label='Cross validation error')
-plt.fill_between(chooses,
-                 -cv_err.mean(axis=1) - cv_err.std(axis=1),
-                 -cv_err.mean(axis=1) + cv_err.std(axis=1),
-                 alpha=0.15, color='green')
-#plt.plot(number_vars, val_err,
-#         color='green', marker='s',
-#         label='Validation error')
-plt.grid()
-plt.xlabel('Number of vraibles in the model')
-plt.ylabel('Root mean square erro')
-plt.title('Performance of the RF model by number of features')
-plt.legend(loc=7)
-plt.show()
+#cv_err1 = cv_err    
+#chooses1 = chooses
 
-# choosing variables
-#choose the best model
-thresh = thress[np.where(val_err == np.min(val_err))[0][-1]]
-choose = np.where(cumsum >= thresh)[0][0]
+
+def importance_plot(chooses, cv_err):
+    cv_err = np.array(cv_err)
+    fig=plt.figure(figsize=(10,10))
+    plt.subplot()
+    plt.plot(chooses, -cv_err.mean(axis=1),
+             color='blue', marker='o',
+             label='Cross validation error')
+    plt.fill_between(chooses,
+                     -cv_err.mean(axis=1) - cv_err.std(axis=1),
+                     -cv_err.mean(axis=1) + cv_err.std(axis=1),
+                     alpha=0.15, color='green')
+#   plt.plot(number_vars, val_err,
+#            color='green', marker='s',
+#            label='Validation error')
+    plt.grid()
+    plt.xlabel('Number of vraibles in the model')
+    plt.ylabel('Mean Absolute Error')
+    plt.title('Performance of the RF model by number of features')
+    plt.legend(loc=8)
+    plt.show()
+
+no_points = 40   
+steps = int(X_train.shape[1]/no_points) 
+chooses1 = [steps*i for i in range(no_points+1)]
+cv_err1 = check_imp(chooses1, rf, X_train, loss_train, indices)
+importance_plot(chooses1, cv_err1)
+
+# smaller
+steps2 = 3
+chooses2 = [3*steps + i * steps2 for i in range(no_points)]
+cv_err2 = check_imp(chooses2, rf, X_train, loss_train, indices)
+importance_plot(chooses2, cv_err2)
+importance_plot(np.append(chooses1,chooses2), np.append(cv_err1, cv_err2, axis=0))
+
+########### The number of important values is 97 considering trade-off between std and mean error
+choose = 97
 impvars = indices[:choose]
-# 12 features where selected
-# trying models with selected features
-## random forest
-rf.fit(X_train_std[:, impvars], target_train)
-math.sqrt(metrics.mean_squared_error(target_val, rf.predict(X_val_std[:, impvars])))
-metrics.r2_score(target_val, rf.predict(X_val_std[:, impvars]))
+
+rf.fit(X_train.iloc[:, impvars], loss_train)
+x =np.where(np.array(chooses2) == (choose-1))
+print("Error = %i +/- %i" %(-cv_err2[x,:].mean(), int(2*cv_err2.std())))
+print("R-squired = %f" 
+      %metrics.r2_score(loss_train, rf.predict(X_train.iloc[:, impvars])))
+
