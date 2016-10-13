@@ -21,13 +21,13 @@ import time
 #    os.path.join(os.getcwd(), os.
 #sys.argv[0]
 #))
-file = zip.ZipFile('train.csv.zip')
+file = zip.ZipFile('train.csv.zip', "c:/Reza/python/regression/Kaggle")
 file.namelist()
 file.extractall()
-data_known = pd.read_csv('train.csv')
+data_known = pd.read_csv("c:/Reza/python/regression/Kaggle/train.csv")
 loss = data_known["loss"]
 loss = np.array(loss)
-loss = loss.astype(theano.config.floatX)
+#loss = loss.astype(theano.config.floatX)
 data_known.drop("loss", axis=1, inplace = True)
 
 
@@ -54,25 +54,34 @@ for f in range(50):
 
 #plt.scatter(X_train["cont7"], loss_train)
 #plt.hist(loss, bins=1000)
-thress = np.array(range(70,100))/100
+thress = np.array(range(79,100))/100
 thress = np.append(thress, .999)
 number_vars=[]
 train_err = []
-threshold = .79
+#threshold = .79
 #val_err=[]
+t0_featselec = time.time()
 for threshold in thress:
     choose = np.where(cumsum >= threshold)[0][0]
     impvars = indices[:choose]
-    rf.fit(np.array(X_train)[:, impvars], loss_train)
+    err = cv.cross_val_score(estimator=rf,
+                          X=np.array(X_train)[:,impvars],
+                          y=loss_train,
+                          scoring = 'mean_absolute_error',
+                          cv=5,
+                          n_jobs=-1)
+#    rf.fit(np.array(X_train)[:, impvars], loss_train)
     number_vars.append(choose+1)
-    train_err.append(math.sqrt(metrics.mean_squared_error(loss_train,rf.predict(np.array(X_train)[:, impvars]))))
+    cvn_err.append(err)
     print(threshold)
+    print('So far %d seconds' %(time.time() - t0_featselec))
+print('Total time: %d' %(time.time()-t0_featselec))
     
 #    val_err.append(math.sqrt(metrics.mean_squared_error(loss_val,rf.predict(X_val_std[:, impvars]))))
 
 fig=plt.figure(figsize=(10,10))
 plt.subplot()
-plt.plot(number_vars, train_err,
+plt.plot(thress, cv_err,
          color='blue', marker='o',
          label='Training error')
 #plt.plot(number_vars, val_err,
@@ -84,3 +93,15 @@ plt.ylabel('Root mean square erro')
 plt.title('Performance of the RF model by number of features')
 plt.legend(loc=7)
 plt.show()
+
+# choosing variables
+#choose the best model
+thresh = thress[np.where(val_err == np.min(val_err))[0][-1]]
+choose = np.where(cumsum >= thresh)[0][0]
+impvars = indices[:choose]
+# 12 features where selected
+# trying models with selected features
+## random forest
+rf.fit(X_train_std[:, impvars], target_train)
+math.sqrt(metrics.mean_squared_error(target_val, rf.predict(X_val_std[:, impvars])))
+metrics.r2_score(target_val, rf.predict(X_val_std[:, impvars]))
