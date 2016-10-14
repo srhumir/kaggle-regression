@@ -37,13 +37,23 @@ data_known.drop("loss", axis=1, inplace = True)
 data_known_dummy = pd.get_dummies(data_known)
 X_train, X_test, loss_train, loss_test = cv.train_test_split(data_known_dummy, loss, test_size = .98, random_state=0)
 
-## feature selection
+#load saved train data
 X_train = pd.read_csv("X_train.csv")
 loss_train = pd.read_csv("loss_train.csv")
 id_train = X_train["id"]
 X_train.drop("Unnamed: 0", axis=1, inplace = True)
 X_train.drop("id", axis=1, inplace = True)
+loss_train.drop("Unnamed: 0", axis=1, inplace = True)
+loss_train = np.ravel(loss_train.values)
+indices = pd.read_csv("indices.csv")
+indices.drop("Unnamed: 0", axis=1, inplace = True)
+indices = np.ravel(indices.values)
+
+
+
+## feature selection
 feat_lables = X_train.columns
+
 rf = en.RandomForestRegressor(n_estimators = 100,
                               random_state = 1,
                               n_jobs= -1)
@@ -145,52 +155,97 @@ importance_plot(chooses1, cv_err1)
 
 # smaller
 steps2 = 3
-chooses2 = [6*steps + i * steps2 for i in range(20)]
+chooses2 = [5*steps + i * steps2 for i in range(20)]
 cv_err2 = check_imp(chooses2, rf, X_train, loss_train, indices)
 importance_plot(chooses2, cv_err2)
 importance_plot(np.append(chooses1,chooses2), np.append(cv_err1, cv_err2, axis=0))
 
-########### The number of important values is 97 considering trade-off between std and mean error
+########### The number of important values is 140 considering trade-off between std and mean error
 pd.DataFrame(indices).to_csv("indices.csv")
-choose = 170
+choose = 140
 impvars = indices[:choose]
 train_data = X_train.iloc[:, impvars]
 std = pp.StandardScaler()
 train_data = std.fit_transform(train_data)
-rf.fit(train_data, loss_train)
-x =np.where(np.array(chooses2) == (choose+1))
-print("Error = %i +/- %i" %(-cv_err2[x,:].mean(), int(2*cv_err2.std())))
-print("R-squired = %f" 
-      %metrics.r2_score(loss_train, rf.predict(train_data)))
+#trying different models
+## RF
+rf = en.RandomForestRegressor(n_estimators = 1000,
+                              random_state = 1,
+                              n_jobs= -1)
+rf_err1000 = cv.cross_val_score(estimator=rf,
+                         X=train_data,
+                         y=loss_train,
+                         scoring = 'neg_mean_absolute_error',
+                         cv=5,
+                         n_jobs=-1)
+#print("Error = %i +/- %i" %(-rf_err200.mean(), int(2*rf_err200.std())))
+#rf_err = pd.DataFrame({'100':rf_err100,'200':rf_err200,'300':rf_err300,'500':rf_err500, '1000':rf_err1000})
+#rf_err.to_csv("rf_error.csv")
+#print("R-squared = %f" 
+#      %metrics.r2_score(loss_train, rf.predict(train_data)))
 
 # Neural network
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.wrappers.scikit_learn import KerasRegressor
-def nn_model():
+def nn_model():#n1,n2=None,n3=None):
 	# create model
 	model = Sequential()
-	model.add(Dense(20, input_dim=impvars.size, init='normal', 
+	model.add(Dense(5, input_dim=impvars.size, init='normal', 
                  activation='relu'))
+#	if n2:
+#         model.add(Dense(n2, init='normal', 
+#                 activation='relu'))
+#	if n3:
+#         model.add(Dense(n3, init='normal',
+#                         activation='relu'))
 	model.add(Dense(1, init='normal'))
-	# Compile model
+
+   # Compile model
 	model.compile(loss='mean_squared_error', optimizer='adam')
 	return model
 # fix random seed for reproducibility
 seed = 7
 np.random.seed(seed)
+from sklearn.model_selection import KFold
+from sklearn.model_selection import cross_val_score
+kfold = KFold(n_splits=10, random_state=seed)
 
+#results = cross_val_score(estimator, X, Y, cv=kfold)
+
+t0_nn = time.time()
 nn = KerasRegressor(build_fn=nn_model, nb_epoch=200, batch_size=5,
                            verbose=0) 
-nn.fit(train_data, loss_train,
-       validation_split=0.1,
-       show_accuracy=True)
-nn_time = time.time()-t0_nn
+#nn.fit(train_data, loss_train,
+#       validation_split=0.1,
+#       show_accuracy=True)
+#nn_time = time.time()-t0_nn
+
 t0_nn= time.time()
-nn_err = cv.cross_val_score(estimator=nn,
+nn_err_5 = cross_val_score(nn,
                             X=train_data,
                             y=loss_train,
-                            scoring = 'mean_absolute_error',
-                            cv=4,
+                            scoring = 'neg_mean_absolute_error',
+                            cv=kfold,
                             n_jobs=-1)
-nn_time = time.time()-t0
+nn_time = time.time()-t0_nn
+#nn_err = pd.DataFrame({'20':nn_err1_20, '100':nn_err_100, '200':nn_err_200, '20-20':nn_err_20_20, '20-50':nn_err_20_50})
+#nn_err.to_csv("nn_error.csv")
+
+#kernel ridge regression
+from sklearn.grid_search import GridSearchCV
+from sklearn.kernel_ridge import KernelRidge
+import time
+kr = KernelRidge(kernel='rbf', gamma=0.1)
+gs_kr = GridSearchCV(kr,
+                  param_grid={"alpha": [1e0, 0.1, 1e-2, 1e-3],
+                              "gamma": np.logspace(-2, 2, 5)},
+                              scoring = 'neg_mean_absolute_error',
+                              cv=5,
+                              n_jobs=-1)
+t0_gs_kr = time.time()
+gs_kr.fit(train_data, loss_train)
+gs_kr_time = time.time()- t0_gs_kr
+
+
+
