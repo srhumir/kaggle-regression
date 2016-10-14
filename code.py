@@ -38,6 +38,11 @@ data_known_dummy = pd.get_dummies(data_known)
 X_train, X_test, loss_train, loss_test = cv.train_test_split(data_known_dummy, loss, test_size = .98, random_state=0)
 
 ## feature selection
+X_train = pd.read_csv("X_train.csv")
+loss_train = pd.read_csv("loss_train.csv")
+id_train = X_train["id"]
+X_train.drop("Unnamed: 0", axis=1, inplace = True)
+X_train.drop("id", axis=1, inplace = True)
 feat_lables = X_train.columns
 rf = en.RandomForestRegressor(n_estimators = 100,
                               random_state = 1,
@@ -140,17 +145,20 @@ importance_plot(chooses1, cv_err1)
 
 # smaller
 steps2 = 3
-chooses2 = [3*steps + i * steps2 for i in range(no_points)]
+chooses2 = [6*steps + i * steps2 for i in range(20)]
 cv_err2 = check_imp(chooses2, rf, X_train, loss_train, indices)
 importance_plot(chooses2, cv_err2)
 importance_plot(np.append(chooses1,chooses2), np.append(cv_err1, cv_err2, axis=0))
 
 ########### The number of important values is 97 considering trade-off between std and mean error
-choose = 97
+pd.DataFrame(indices).to_csv("indices.csv")
+choose = 170
 impvars = indices[:choose]
 train_data = X_train.iloc[:, impvars]
+std = pp.StandardScaler()
+train_data = std.fit_transform(train_data)
 rf.fit(train_data, loss_train)
-x =np.where(np.array(chooses2) == (choose-1))
+x =np.where(np.array(chooses2) == (choose+1))
 print("Error = %i +/- %i" %(-cv_err2[x,:].mean(), int(2*cv_err2.std())))
 print("R-squired = %f" 
       %metrics.r2_score(loss_train, rf.predict(train_data)))
@@ -173,14 +181,14 @@ seed = 7
 np.random.seed(seed)
 
 nn = KerasRegressor(build_fn=nn_model, nb_epoch=200, batch_size=5,
-                           verbose=1) 
-nn.fit(train_data.values, loss_train,
+                           verbose=0) 
+nn.fit(train_data, loss_train,
        validation_split=0.1,
        show_accuracy=True)
 nn_time = time.time()-t0_nn
 t0_nn= time.time()
 nn_err = cv.cross_val_score(estimator=nn,
-                            X=train_data.values,
+                            X=train_data,
                             y=loss_train,
                             scoring = 'mean_absolute_error',
                             cv=4,
