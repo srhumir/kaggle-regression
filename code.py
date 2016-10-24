@@ -46,7 +46,7 @@ known_rows = data_known.shape[0]
 data_known_dummy = data_dummy.iloc[:known_rows,:]
 data_submit_dummy= data_dummy.iloc[known_rows:,:]
 del(data_dummy)
-X_train, X_test, loss_train, loss_test = ms.train_test_split(data_known_dummy, loss, test_size = .3, random_state=0)
+X_train, X_test, loss_train, loss_test = ms.train_test_split(data_known_dummy, loss, test_size = .1, random_state=0)
 X_val, X_test, loss_val, loss_test = ms.train_test_split(X_test, loss_test, test_size = .20, random_state=0)
 #X_val2, X_test, loss_val2, loss_test = ms.train_test_split(X_test, loss_test, test_size = .66, random_state=0)
 #X_val3, X_test, loss_val3, loss_test = ms.train_test_split(X_test, loss_test, test_size = .5, random_state=0)
@@ -180,8 +180,10 @@ chooses2 = [int(X_train.shape[1]/40)*i for i in range(10,15)]
 #chooses1 = [steps*i for i in range(no_points+1)]
 cv_err2 = check_imp(chooses2, rf, X_train, loss_train, indices, X_val, loss_val)
 importance_plot(np.array(chooses2)+1, cv_err2)
-importance_plot(np.append(chooses1,chooses2), np.append(cv_err1, cv_err2, axis=0))
-
+importance_plot(np.append(chooses1,chooses2)+1, np.append(cv_err1, cv_err2, axis=0))
+imp_err = pd.concat([pd.DataFrame({'Number_of_features':np.append(chooses1,chooses2)+1}),
+                     pd.DataFrame(np.append(cv_err1, cv_err2, axis=0))], axis=1)
+imp_err.to_csv('imp_plot.csv')
 # smaller
 #steps2 = 3
 #chooses3 = [5*steps + i * steps2 for i in range(20)]
@@ -191,10 +193,12 @@ importance_plot(np.append(chooses1,chooses2), np.append(cv_err1, cv_err2, axis=0
 
 ########### The number of important values is 140 considering trade-off between std and mean error
 pd.DataFrame(indices).to_csv("indices_noid.csv")
-choose = 150
+choose = 139
 impvars = indices[:choose]
 train_data = X_train.iloc[:, impvars]
 std = pp.StandardScaler()
+#train_all = 
+#train_all = std.fit_transform
 train_data = std.fit_transform(train_data)
 test_data = X_test.iloc[:,impvars]
 test_data = std.transform(test_data)
@@ -202,7 +206,7 @@ val_data = X_val.iloc[:,impvars]
 val_data = std.transform(val_data)
 #trying different models
 ## RF
-rf = en.RandomForestRegressor(n_estimators = 1000,
+rf = en.RandomForestRegressor(n_estimators = 500,
                               random_state = 1,
                               n_jobs= -1)
 rf.fit(train_data, loss_train)
@@ -226,6 +230,8 @@ theano.config.openmp = True
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.wrappers.scikit_learn import KerasRegressor
+import keras
+#sgd = keras.optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
 def nn_model():#n1,n2=None,n3=None):
 	# create model
 	model = Sequential()
@@ -247,24 +253,38 @@ np.random.seed(seed)
 kfold = ms.KFold(n_splits=10, random_state=seed)
 
 #results = cross_val_score(estimator, X, Y, cv=kfold)
-epo = 1300
-nn = KerasRegressor(build_fn=nn_model, nb_epoch=epo, batch_size=250,
+epo = 200
+nn = KerasRegressor(build_fn=nn_model, nb_epoch=epo, batch_size=10,
                            verbose=0) 
 t0_nn = time.time()
-history_nn = nn.fit(train_data, loss_train,
-       validation_split=0.1)
-nn_time = time.time()-t0_nn
-start = 100
-plt.plot(range(start,epo), np.sqrt(history_nn.history['val_loss'][start:]))
+history_nn = nn.fit(train_data, loss_train)#,
+#       validation_split=0.1)
+nn_time = (time.time()-t0_nn)/60
+start = 5
+plt.plot(range(start,epo), np.sqrt(history_nn.history['loss'][start:]))
 
-print(metrics.mean_absolute_error(loss_val, nn.predict(val_data)))
+print(metrics.mean_absolute_error(loss_train, nn.predict(train_data)))
 print(metrics.mean_absolute_error(loss_test, nn.predict(test_data)))
+# boosting
+boost_nn = en.BaggingRegressor(base_estimator = nn,
+                                   n_estimators = 10,
+                                   max_samples=1.0, 
+                                   max_features=50, 
+                                   bootstrap=True, 
+                                   warm_start=True, 
+                                   n_jobs=-1, 
+                                   random_state=0, 
+                                   verbose=1
+                                   )
+t0 = time.time()
+boost_nn.fit(train_data, loss_train)
+t_boost = (time.time()-t0)/60
 # submit
 train_submit = data_submit_dummy.iloc[:,impvars]
 train_submit = std.transform(train_submit)
 loss_submit = nn.predict(train_submit)
 to_submit= pd.DataFrame({'id': submit_id, 'loss' : loss_submit})
-to_submit.to_csv('submit5.csv', index=False)
+to_submit.to_csv('submit10.csv', index=False)
 
 
 
