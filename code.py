@@ -10,7 +10,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 #import theano
 import sklearn.preprocessing as pp
-import sklearn.cross_validation as cv
+#import sklearn.cross_validation as cv
+import sklearn.model_selection as ms
 import math
 import sklearn.ensemble as en
 #import sklearn.pipeline as pip
@@ -31,25 +32,29 @@ loss = data_known["loss"]
 loss = np.array(loss)
 #loss = loss.astype(theano.config.floatX)
 data_known.drop("loss", axis=1, inplace = True)
+data_known.drop("id", axis=1, inplace = True)
+
 
 
 # dummy variables
 data_known_dummy = pd.get_dummies(data_known)
-X_train, X_test, loss_train, loss_test = cv.train_test_split(data_known_dummy, loss, test_size = .98, random_state=0)
+X_train, X_test, loss_train, loss_test = ms.train_test_split(data_known_dummy, loss, test_size = .3, random_state=0)
 
-#load saved train data
-X_train = pd.read_csv("X_train.csv")
-loss_train = pd.read_csv("loss_train.csv")
-id_train = X_train["id"]
-X_train.drop("Unnamed: 0", axis=1, inplace = True)
-X_train.drop("id", axis=1, inplace = True)
-loss_train.drop("Unnamed: 0", axis=1, inplace = True)
-loss_train = np.ravel(loss_train.values)
-indices = pd.read_csv("indices.csv")
-indices.drop("Unnamed: 0", axis=1, inplace = True)
-indices = np.ravel(indices.values)
-
-
+#==============================================================================
+# #load saved train data
+# X_train = pd.read_csv("X_train.csv")
+# loss_train = pd.read_csv("loss_train.csv")
+# id_train = X_train["id"]
+# X_train.drop("Unnamed: 0", axis=1, inplace = True)
+# X_train.drop("id", axis=1, inplace = True)
+# loss_train.drop("Unnamed: 0", axis=1, inplace = True)
+# loss_train = np.ravel(loss_train.values)
+# indices = pd.read_csv("indices.csv")
+# indices.drop("Unnamed: 0", axis=1, inplace = True)
+# indices = np.ravel(indices.values)
+# 
+# 
+#==============================================================================
 
 ## feature selection
 feat_lables = X_train.columns
@@ -104,17 +109,17 @@ for f in range(50):
 # print('Total time: %d seconds' %(time.time()-t0_featselec))
 #==============================================================================
 #    val_err.append(math.sqrt(metrics.mean_squared_error(loss_val,rf.predict(X_val_std[:, impvars]))))
-chooses = [int(X_train.shape[1]/40)*i for i in range(42)]
+#chooses = [int(X_train.shape[1]/40)*i for i in range(20)]
 def check_imp(chooses, rfmodel, X_train, y_train, indices):
     cv_err =[]
     t0_featselec = time.time()
     for choose in chooses:
         impvars = indices[:choose+1]
-        err = cv.cross_val_score(estimator=rfmodel,
+        err = ms.cross_val_score(estimator=rfmodel,
                                  X=X_train.iloc[:,impvars],
                                  y=y_train,
-                          scoring = 'mean_absolute_error',
-                          cv=5,
+                          scoring = 'neg_mean_absolute_error',
+                          cv=4,
                           n_jobs=-1)
         cv_err.append(err)
         print(choose)
@@ -147,9 +152,10 @@ def importance_plot(chooses, cv_err):
     plt.legend(loc=8)
     plt.show()
 
-no_points = 40   
+no_points = 20
 steps = int(X_train.shape[1]/no_points) 
-chooses1 = [steps*i for i in range(no_points+1)]
+chooses1 = [int(X_train.shape[1]/40)*i for i in range(20)]
+#chooses1 = [steps*i for i in range(no_points+1)]
 cv_err1 = check_imp(chooses1, rf, X_train, loss_train, indices)
 importance_plot(chooses1, cv_err1)
 
@@ -161,7 +167,7 @@ importance_plot(chooses2, cv_err2)
 importance_plot(np.append(chooses1,chooses2), np.append(cv_err1, cv_err2, axis=0))
 
 ########### The number of important values is 140 considering trade-off between std and mean error
-pd.DataFrame(indices).to_csv("indices.csv")
+pd.DataFrame(indices).to_csv("indices_noid.csv")
 choose = 140
 impvars = indices[:choose]
 train_data = X_train.iloc[:, impvars]
@@ -172,7 +178,7 @@ train_data = std.fit_transform(train_data)
 rf = en.RandomForestRegressor(n_estimators = 1000,
                               random_state = 1,
                               n_jobs= -1)
-rf_err1000 = cv.cross_val_score(estimator=rf,
+rf_err1000 = ms.cross_val_score(estimator=rf,
                          X=train_data,
                          y=loss_train,
                          scoring = 'neg_mean_absolute_error',
@@ -191,14 +197,12 @@ from keras.wrappers.scikit_learn import KerasRegressor
 def nn_model():#n1,n2=None,n3=None):
 	# create model
 	model = Sequential()
-	model.add(Dense(5, input_dim=impvars.size, init='normal', 
+	model.add(Dense(20, input_dim=impvars.size, init='normal', 
                  activation='relu'))
-#	if n2:
-#         model.add(Dense(n2, init='normal', 
+#	model.add(Dense(20, init='normal', 
 #                 activation='relu'))
-#	if n3:
-#         model.add(Dense(n3, init='normal',
-#                         activation='relu'))
+#	model.add(Dense(20, init='normal', 
+#                 activation='relu'))
 	model.add(Dense(1, init='normal'))
 
    # Compile model
@@ -222,7 +226,7 @@ nn = KerasRegressor(build_fn=nn_model, nb_epoch=200, batch_size=5,
 #nn_time = time.time()-t0_nn
 
 t0_nn= time.time()
-nn_err_5 = cross_val_score(nn,
+nn_err_280 = cross_val_score(nn,
                             X=train_data,
                             y=loss_train,
                             scoring = 'neg_mean_absolute_error',

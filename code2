@@ -1,0 +1,34 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Oct 20 12:35:54 2016
+
+@author: sreza
+"""
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+#import theano
+import sklearn.preprocessing as pp
+import sklearn.cross_validation as cv
+import math
+import sklearn.ensemble as en
+#import sklearn.pipeline as pip
+import sklearn.metrics as metrics
+import time
+
+data_known = pd.read_csv("https://github.com/srhumir/kaggle-regression/raw/master/train.csv")
+loss = data_known["loss"]
+loss = np.array(loss)
+#loss = loss.astype(theano.config.floatX)
+data_known.drop("loss", axis=1, inplace = True)
+data_known.drop("id", axis=1, inplace = True)
+
+
+# dummy variables
+data_known_dummy = pd.get_dummies(data_known)
+X_train, X_test, loss_train, loss_test = cv.train_test_split(data_known_dummy, loss, test_size = .2, random_state=0)
+#load saved variable importance
+indices = pd.read_csv("indices.csv")
+indices.drop("Unnamed: 0", axis=1, inplace = True)
+indices = np.ravel(indices.values)

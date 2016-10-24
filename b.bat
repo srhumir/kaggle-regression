@@ -7,6 +7,7 @@ wget "https://github.com/srhumir/kaggle-regression/raw/master/loss_train.csv"
 wget "https://github.com/srhumir/kaggle-regression/raw/master/X_train.csv"
 wget "https://repo.continuum.io/archive/Anaconda3-4.2.0-Linux-x86_64.sh"
 bash Anaconda3-4.2.0-Linux-x86_64.sh
+. ~/.profile
 conda uninstall scikit-learn
 pip install sklearn
 pip install Theano
