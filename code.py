@@ -12,7 +12,8 @@ import matplotlib.pyplot as plt
 import sklearn.preprocessing as pp
 #import sklearn.cross_validation as cv
 import sklearn.model_selection as ms
-import math
+
+#import math
 import sklearn.ensemble as en
 #import sklearn.pipeline as pip
 import sklearn.metrics as metrics
@@ -39,7 +40,9 @@ data_known.drop("id", axis=1, inplace = True)
 # dummy variables
 data_known_dummy = pd.get_dummies(data_known)
 X_train, X_test, loss_train, loss_test = ms.train_test_split(data_known_dummy, loss, test_size = .3, random_state=0)
-
+X_val, X_test, loss_val, loss_test = ms.train_test_split(X_test, loss_test, test_size = .20, random_state=0)
+#X_val2, X_test, loss_val2, loss_test = ms.train_test_split(X_test, loss_test, test_size = .66, random_state=0)
+#X_val3, X_test, loss_val3, loss_test = ms.train_test_split(X_test, loss_test, test_size = .5, random_state=0)
 #==============================================================================
 # #load saved train data
 # X_train = pd.read_csv("X_train.csv")
@@ -110,19 +113,27 @@ for f in range(50):
 #==============================================================================
 #    val_err.append(math.sqrt(metrics.mean_squared_error(loss_val,rf.predict(X_val_std[:, impvars]))))
 #chooses = [int(X_train.shape[1]/40)*i for i in range(20)]
-def check_imp(chooses, rfmodel, X_train, y_train, indices):
+def check_imp(chooses, rfmodel, X_train, y_train, indices, X_val, y_val):
     cv_err =[]
+    kf = ms.KFold(n_splits=4, random_state=0)
     t0_featselec = time.time()
     for choose in chooses:
         impvars = indices[:choose+1]
-        err = ms.cross_val_score(estimator=rfmodel,
-                                 X=X_train.iloc[:,impvars],
-                                 y=y_train,
-                          scoring = 'neg_mean_absolute_error',
-                          cv=4,
-                          n_jobs=-1)
+        rf.fit(X_train.iloc[:,impvars], y=y_train, )
+        err =[]
+        for train, test in kf.split(X_val):
+            err.append(metrics.mean_absolute_error(y_val[test], rf.predict(X_val.iloc[test,impvars])))
+#==============================================================================
+#         err = ms.cross_val_score(estimator=rfmodel,
+#                                  X=X_train.iloc[:,impvars],
+#                                  y=y_train,
+#                           scoring = 'neg_mean_absolute_error',
+#                           cv=4,
+#                           n_jobs=-1)
+#==============================================================================
+        err=np.transpose(err)
         cv_err.append(err)
-        print(choose)
+        print('With %d variables. Step %d of %d' %((choose+1), np.where(np.array(chooses)==choose)[0]+1,len(chooses)))
         print('So far %d seconds' %(time.time() - t0_featselec))
     print('Total time: %d seconds' %(time.time()-t0_featselec))
     return(np.array(cv_err))
@@ -135,13 +146,13 @@ def importance_plot(chooses, cv_err):
     cv_err = np.array(cv_err)
     fig=plt.figure(figsize=(10,10))
     plt.subplot()
-    plt.plot(chooses, -cv_err.mean(axis=1),
+    plt.plot(chooses, cv_err.mean(axis=1),
              color='blue', marker='o',
              label='Cross validation error')
     plt.fill_between(chooses,
-                     -cv_err.mean(axis=1) - cv_err.std(axis=1),
-                     -cv_err.mean(axis=1) + cv_err.std(axis=1),
-                     alpha=0.15, color='green')
+                     cv_err.mean(axis=1) - cv_err.std(axis=1),
+                     cv_err.mean(axis=1) + cv_err.std(axis=1),
+                     alpha=0.3, color='green')
 #   plt.plot(number_vars, val_err,
 #            color='green', marker='s',
 #            label='Validation error')
@@ -154,10 +165,10 @@ def importance_plot(chooses, cv_err):
 
 no_points = 20
 steps = int(X_train.shape[1]/no_points) 
-chooses1 = [int(X_train.shape[1]/40)*i for i in range(20)]
+chooses1 = [int(X_train.shape[1]/40)*i for i in range(10)]
 #chooses1 = [steps*i for i in range(no_points+1)]
-cv_err1 = check_imp(chooses1, rf, X_train, loss_train, indices)
-importance_plot(chooses1, cv_err1)
+cv_err1 = check_imp(chooses1, rf, X_train, loss_train, indices, X_val, loss_val)
+importance_plot(np.array(chooses1)+1, cv_err1)
 
 # smaller
 steps2 = 3
@@ -211,9 +222,8 @@ def nn_model():#n1,n2=None,n3=None):
 # fix random seed for reproducibility
 seed = 7
 np.random.seed(seed)
-from sklearn.model_selection import KFold
-from sklearn.model_selection import cross_val_score
-kfold = KFold(n_splits=10, random_state=seed)
+#from sklearn.model_selection import cross_val_score
+kfold = ms.KFold(n_splits=10, random_state=seed)
 
 #results = cross_val_score(estimator, X, Y, cv=kfold)
 
@@ -226,7 +236,7 @@ nn = KerasRegressor(build_fn=nn_model, nb_epoch=200, batch_size=5,
 #nn_time = time.time()-t0_nn
 
 t0_nn= time.time()
-nn_err_280 = cross_val_score(nn,
+nn_err_280 = ms.cross_val_score(nn,
                             X=train_data,
                             y=loss_train,
                             scoring = 'neg_mean_absolute_error',
