@@ -34,11 +34,18 @@ loss = np.array(loss)
 #loss = loss.astype(theano.config.floatX)
 data_known.drop("loss", axis=1, inplace = True)
 data_known.drop("id", axis=1, inplace = True)
-
+# submit data
+data_submit = pd.read_csv('test.csv')
+submit_id = data_submit['id']
+data_submit.drop('id', axis=1, inplace=True)
 
 
 # dummy variables
-data_known_dummy = pd.get_dummies(data_known)
+data_dummy = pd.get_dummies(pd.concat([data_known,data_submit], axis=0))
+known_rows = data_known.shape[0]
+data_known_dummy = data_dummy.iloc[:known_rows,:]
+data_submit_dummy= data_dummy.iloc[known_rows:,:]
+del(data_dummy)
 X_train, X_test, loss_train, loss_test = ms.train_test_split(data_known_dummy, loss, test_size = .3, random_state=0)
 X_val, X_test, loss_val, loss_test = ms.train_test_split(X_test, loss_test, test_size = .20, random_state=0)
 #X_val2, X_test, loss_val2, loss_test = ms.train_test_split(X_test, loss_test, test_size = .66, random_state=0)
@@ -119,7 +126,7 @@ def check_imp(chooses, rfmodel, X_train, y_train, indices, X_val, y_val):
     t0_featselec = time.time()
     for choose in chooses:
         impvars = indices[:choose+1]
-        rf.fit(X_train.iloc[:,impvars], y=y_train, )
+        rf.fit(X_train.iloc[:,impvars], y=y_train)
         err =[]
         for train, test in kf.split(X_val):
             err.append(metrics.mean_absolute_error(y_val[test], rf.predict(X_val.iloc[test,impvars])))
@@ -169,32 +176,42 @@ chooses1 = [int(X_train.shape[1]/40)*i for i in range(10)]
 #chooses1 = [steps*i for i in range(no_points+1)]
 cv_err1 = check_imp(chooses1, rf, X_train, loss_train, indices, X_val, loss_val)
 importance_plot(np.array(chooses1)+1, cv_err1)
+chooses2 = [int(X_train.shape[1]/40)*i for i in range(10,15)]
+#chooses1 = [steps*i for i in range(no_points+1)]
+cv_err2 = check_imp(chooses2, rf, X_train, loss_train, indices, X_val, loss_val)
+importance_plot(np.array(chooses2)+1, cv_err2)
+importance_plot(np.append(chooses1,chooses2), np.append(cv_err1, cv_err2, axis=0))
 
 # smaller
-steps2 = 3
-chooses2 = [5*steps + i * steps2 for i in range(20)]
-cv_err2 = check_imp(chooses2, rf, X_train, loss_train, indices)
-importance_plot(chooses2, cv_err2)
-importance_plot(np.append(chooses1,chooses2), np.append(cv_err1, cv_err2, axis=0))
+#steps2 = 3
+#chooses3 = [5*steps + i * steps2 for i in range(20)]
+#cv_err3 = check_imp(chooses2, rf, X_train, loss_train, indices, X_val, loss_val)
+#importance_plot(chooses2, cv_err2)
+#importance_plot(np.append(chooses1,chooses2), np.append(cv_err1, cv_err2, axis=0))
 
 ########### The number of important values is 140 considering trade-off between std and mean error
 pd.DataFrame(indices).to_csv("indices_noid.csv")
-choose = 140
+choose = 150
 impvars = indices[:choose]
 train_data = X_train.iloc[:, impvars]
 std = pp.StandardScaler()
 train_data = std.fit_transform(train_data)
+test_data = X_test.iloc[:,impvars]
+test_data = std.transform(test_data)
+val_data = X_val.iloc[:,impvars]
+val_data = std.transform(val_data)
 #trying different models
 ## RF
 rf = en.RandomForestRegressor(n_estimators = 1000,
                               random_state = 1,
                               n_jobs= -1)
-rf_err1000 = ms.cross_val_score(estimator=rf,
-                         X=train_data,
-                         y=loss_train,
-                         scoring = 'neg_mean_absolute_error',
-                         cv=5,
-                         n_jobs=-1)
+rf.fit(train_data, loss_train)
+#rf_err1000 = ms.cross_val_score(estimator=rf,
+#                         X=train_data,
+#                         y=loss_train,
+#                         scoring = 'neg_mean_absolute_error',
+#                         cv=5,
+#                         n_jobs=-1)
 #print("Error = %i +/- %i" %(-rf_err200.mean(), int(2*rf_err200.std())))
 #rf_err = pd.DataFrame({'100':rf_err100,'200':rf_err200,'300':rf_err300,'500':rf_err500, '1000':rf_err1000})
 #rf_err.to_csv("rf_error.csv")
@@ -202,6 +219,10 @@ rf_err1000 = ms.cross_val_score(estimator=rf,
 #      %metrics.r2_score(loss_train, rf.predict(train_data)))
 
 # Neural network
+import theano
+theano.config.openmp_elemwise_minsize=250
+OMP_NUM_THREADS=4
+theano.config.openmp = True
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.wrappers.scikit_learn import KerasRegressor
@@ -217,7 +238,7 @@ def nn_model():#n1,n2=None,n3=None):
 	model.add(Dense(1, init='normal'))
 
    # Compile model
-	model.compile(loss='mean_squared_error', optimizer='adam')
+	model.compile(loss='mse', optimizer='adam')
 	return model
 # fix random seed for reproducibility
 seed = 7
@@ -226,14 +247,26 @@ np.random.seed(seed)
 kfold = ms.KFold(n_splits=10, random_state=seed)
 
 #results = cross_val_score(estimator, X, Y, cv=kfold)
-
-t0_nn = time.time()
-nn = KerasRegressor(build_fn=nn_model, nb_epoch=200, batch_size=5,
+epo = 1300
+nn = KerasRegressor(build_fn=nn_model, nb_epoch=epo, batch_size=250,
                            verbose=0) 
-#nn.fit(train_data, loss_train,
-#       validation_split=0.1,
-#       show_accuracy=True)
-#nn_time = time.time()-t0_nn
+t0_nn = time.time()
+history_nn = nn.fit(train_data, loss_train,
+       validation_split=0.1)
+nn_time = time.time()-t0_nn
+start = 100
+plt.plot(range(start,epo), np.sqrt(history_nn.history['val_loss'][start:]))
+
+print(metrics.mean_absolute_error(loss_val, nn.predict(val_data)))
+print(metrics.mean_absolute_error(loss_test, nn.predict(test_data)))
+# submit
+train_submit = data_submit_dummy.iloc[:,impvars]
+train_submit = std.transform(train_submit)
+loss_submit = nn.predict(train_submit)
+to_submit= pd.DataFrame({'id': submit_id, 'loss' : loss_submit})
+to_submit.to_csv('submit5.csv', index=False)
+
+
 
 t0_nn= time.time()
 nn_err_280 = ms.cross_val_score(nn,
