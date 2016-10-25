@@ -197,6 +197,7 @@ imp_err.to_csv('imp_plot.csv')
 pd.DataFrame(indices).to_csv("indices_noid.csv")
 choose = 250
 impvars = indices[:choose]
+impvars = np.transpose(impvars)
 train_data = X_train.iloc[:, impvars]
 std = pp.StandardScaler()
 #train_all = 
@@ -227,17 +228,17 @@ rf.fit(train_data, loss_train)
 # Neural network
 import theano
 theano.config.openmp_elemwise_minsize=250
-OMP_NUM_THREADS=4
+OMP_NUM_THREADS=60
 theano.config.openmp = True
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.wrappers.scikit_learn import KerasRegressor
-import keras
+#import keras
 #sgd = keras.optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
 def nn_model():#n1,n2=None,n3=None):
 	# create model
 	model = Sequential()
-	model.add(Dense(20, input_dim=100, init='normal', 
+	model.add(Dense(20, input_dim=250, init='normal', 
                  activation='relu'))
 #	model.add(Dense(20, init='normal', 
 #                 activation='relu'))
@@ -255,9 +256,9 @@ np.random.seed(seed)
 kfold = ms.KFold(n_splits=10, random_state=seed)
 
 #results = cross_val_score(estimator, X, Y, cv=kfold)
-epo = 200
+epo = 20
 nn = KerasRegressor(build_fn=nn_model, nb_epoch=epo, batch_size=10,
-                           verbose=0) 
+                           verbose=1) 
 t0_nn = time.time()
 history_nn = nn.fit(train_data, loss_train)#,
 #       validation_split=0.1)
