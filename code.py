@@ -77,6 +77,8 @@ rf.fit(X_train, loss_train)
 t_rf = time.time() - t0_rf
 
 imps = rf.feature_importances_
+#imps_name = pd.DataFrame({'Feature': feat_lables, 'Importance':imps})
+#imps_name.to_csv('imps.csv', index=False)
 indices = np.argsort(imps)[::-1]
 cumsum = np.cumsum(imps[indices])
 for f in range(50):
@@ -193,7 +195,7 @@ imp_err.to_csv('imp_plot.csv')
 
 ########### The number of important values is 140 considering trade-off between std and mean error
 pd.DataFrame(indices).to_csv("indices_noid.csv")
-choose = 139
+choose = 250
 impvars = indices[:choose]
 train_data = X_train.iloc[:, impvars]
 std = pp.StandardScaler()
@@ -202,8 +204,8 @@ std = pp.StandardScaler()
 train_data = std.fit_transform(train_data)
 test_data = X_test.iloc[:,impvars]
 test_data = std.transform(test_data)
-val_data = X_val.iloc[:,impvars]
-val_data = std.transform(val_data)
+#val_data = X_val.iloc[:,impvars]
+#val_data = std.transform(val_data)
 #trying different models
 ## RF
 rf = en.RandomForestRegressor(n_estimators = 500,
@@ -235,7 +237,7 @@ import keras
 def nn_model():#n1,n2=None,n3=None):
 	# create model
 	model = Sequential()
-	model.add(Dense(20, input_dim=impvars.size, init='normal', 
+	model.add(Dense(20, input_dim=100, init='normal', 
                  activation='relu'))
 #	model.add(Dense(20, init='normal', 
 #                 activation='relu'))
@@ -267,9 +269,9 @@ print(metrics.mean_absolute_error(loss_train, nn.predict(train_data)))
 print(metrics.mean_absolute_error(loss_test, nn.predict(test_data)))
 # boosting
 boost_nn = en.BaggingRegressor(base_estimator = nn,
-                                   n_estimators = 10,
+                                   n_estimators = 70,
                                    max_samples=1.0, 
-                                   max_features=50, 
+                                   max_features=100, 
                                    bootstrap=True, 
                                    warm_start=True, 
                                    n_jobs=-1, 
@@ -282,9 +284,9 @@ t_boost = (time.time()-t0)/60
 # submit
 train_submit = data_submit_dummy.iloc[:,impvars]
 train_submit = std.transform(train_submit)
-loss_submit = nn.predict(train_submit)
+loss_submit = boost_nn.predict(train_submit)
 to_submit= pd.DataFrame({'id': submit_id, 'loss' : loss_submit})
-to_submit.to_csv('submit10.csv', index=False)
+to_submit.to_csv('submitboost2.csv', index=False)
 
 
 
