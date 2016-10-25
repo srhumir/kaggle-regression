@@ -3,8 +3,6 @@
 cd ~
 mkdir Documents
 cd Documents
-wget "https://github.com/srhumir/kaggle-regression/raw/master/loss_train.csv"
-wget "https://github.com/srhumir/kaggle-regression/raw/master/X_train.csv"
 wget "https://repo.continuum.io/archive/Anaconda3-4.2.0-Linux-x86_64.sh"
 bash Anaconda3-4.2.0-Linux-x86_64.sh
 . ~/.profile
@@ -18,4 +16,5 @@ cd .keras
 wget "https://github.com/srhumir/kaggle-regression/raw/master/keras.json"
 cd ~
 cd Documents
-jupyter console
+wget "https://github.com/srhumir/kaggle-regression/raw/master/boost_for_aws.py" 
+python boost_for_aws.py
