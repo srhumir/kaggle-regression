@@ -40,7 +40,7 @@ data_known_dummy = data_dummy.iloc[:known_rows,:]
 data_submit_dummy= data_dummy.iloc[known_rows:,:]
 del(data_dummy)
 X_train, X_test, loss_train, loss_test = ms.train_test_split(data_known_dummy, loss, test_size = .1, random_state=0)
-X_val, X_test, loss_val, loss_test = ms.train_test_split(X_test, loss_test, test_size = .20, random_state=0)
+#X_val, X_test, loss_val, loss_test = ms.train_test_split(X_test, loss_test, test_size = .20, random_state=0)
 #X_val2,
 indices = pd.read_csv('https://github.com/srhumir/kaggle-regression/raw/master/indices_noid.csv')
 indices.drop(indices.columns[0], inplace= True, axis=1)
@@ -51,11 +51,13 @@ impvars = indices[:choose]
 impvars = np.transpose(impvars)
 train_data = X_train.iloc[:, impvars]
 std = pp.StandardScaler()
-#train_all = 
-#train_all = std.fit_transform
 train_data = std.fit_transform(train_data)
 test_data = X_test.iloc[:,impvars]
 test_data = std.transform(test_data)
+train_submit = data_submit_dummy.iloc[:,impvars]
+train_submit = std.transform(train_submit)
+
+
 print("starting nn")
 # Neural network
 import theano
@@ -90,8 +92,13 @@ print("numbes of epoch %i" %epo)
 nn = KerasRegressor(build_fn=nn_model, nb_epoch=epo, batch_size=10,
                            verbose=0) 
 print("seat back and relax. I am training")
-boost_nn = en.BaggingRegressor(base_estimator = nn,
-                                   n_estimators = 500,
+train_steps = 50
+n_estimators= 500
+no_steps = int(n_estimators/50)
+t0 = time.time()
+for i in range(1,no_steps+1):
+	boost_nn = en.BaggingRegressor(base_estimator = nn,
+                                   n_estimators = i*train_steps,
                                    max_samples=1.0, 
                                    max_features=100, 
                                    bootstrap=True, 
@@ -100,17 +107,21 @@ boost_nn = en.BaggingRegressor(base_estimator = nn,
                                    random_state=0, 
                                    verbose=1
                                    )
-t0 = time.time()
-boost_nn.fit(train_data, loss_train)
-t_boost = (time.time()-t0)/60
-print("My error on test")
-print(metrics.mean_absolute_error(loss_test, boost_nn.predict(test_data)))
-print("My error on train")
-print(metrics.mean_absolute_error(loss_train, boost_nn.predict(train_data)))
-print("it took %f minutes" %t_boost)
-# submit
-train_submit = data_submit_dummy.iloc[:,impvars]
-train_submit = std.transform(train_submit)
-loss_submit = boost_nn.predict(train_submit)
-to_submit= pd.DataFrame({'id': submit_id, 'loss' : loss_submit})
-to_submit.to_csv('submitboost3.csv', index=False)
+	print('Step %i of %i. %i estimators' %(i,steps, i*rain_steps))
+	tillnow= (time.time-t0)/60
+	remaining = tillnow / i * (no_steps-i)
+	print('till now %f minutes. Remaining %f minutes' %(tillnow, remaining)) 
+	#t0 = time.time()
+	boost_nn.fit(train_data, loss_train)
+	t_boost = (time.time()-t0)/60
+	print("My error on test")
+	print(metrics.mean_absolute_error(loss_test, boost_nn.predict(test_data)))
+	print("My error on train")
+	print(metrics.mean_absolute_error(loss_train, boost_nn.predict(train_data)))
+	print("it took %f minutes" %t_boost)
+	# submit
+	loss_submit = boost_nn.predict(train_submit)
+	to_submit= pd.DataFrame({'id': submit_id, 'loss' : loss_submit})
+	to_submit.to_csv('submitboost2'+str(i)+'.csv', index=False)
+
+
