@@ -8,7 +8,7 @@ Created on Tue Oct 25 10:12:40 2016
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 #import theano
 import sklearn.preprocessing as pp
 #import sklearn.cross_validation as cv
