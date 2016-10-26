@@ -303,7 +303,7 @@ nn_time = time.time()-t0_nn
 #nn_err.to_csv("nn_error.csv")
 
 #kernel ridge regression
-from sklearn.grid_search import GridSearchCV
+from sklearn.model_selection import GridSearchCV
 from sklearn.kernel_ridge import KernelRidge
 import time
 kr = KernelRidge(kernel='rbf', gamma=0.1)
@@ -311,7 +311,7 @@ gs_kr = GridSearchCV(kr,
                   param_grid={"alpha": [1e0, 0.1, 1e-2, 1e-3],
                               "gamma": np.logspace(-2, 2, 5)},
                               scoring = 'neg_mean_absolute_error',
-                              cv=5,
+                              cv=4,
                               n_jobs=-1)
 t0_gs_kr = time.time()
 gs_kr.fit(train_data, loss_train)
