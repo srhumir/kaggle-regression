@@ -11,4 +11,4 @@ wget "https://github.com/srhumir/kaggle-regression/raw/master/keras.json"
 cd ~
 cd Documents
 wget "https://github.com/srhumir/kaggle-regression/raw/master/boost_for_aws.py" 
-python boost_for_aws.py
+
