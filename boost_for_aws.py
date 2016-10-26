@@ -87,8 +87,8 @@ epo = 200
 print("numbes of epoch %i" %epo)
 nn = KerasRegressor(build_fn=nn_model, nb_epoch=epo, batch_size=10,
                            verbose=0) 
-train_steps = 35
-n_estimators= 500
+train_steps = 65
+n_estimators= 540
 no_steps = int(n_estimators/train_steps)
 boost_nn = en.BaggingRegressor(base_estimator = nn,
                                n_estimators = train_steps,
@@ -97,7 +97,7 @@ boost_nn = en.BaggingRegressor(base_estimator = nn,
                                bootstrap=True, 
                                warm_start=True, 
                                n_jobs=-1, 
-                               random_state=0, 
+                               random_state=65, 
                                verbose=0
                                )
 
