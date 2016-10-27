@@ -34,8 +34,14 @@ loss = np.array(loss)
 #loss = loss.astype(theano.config.floatX)
 data_known.drop("loss", axis=1, inplace = True)
 data_known.drop("id", axis=1, inplace = True)
+# remove outliers
+keep_ind = np.where(np.logical_and(loss >= 100, loss<=30000))
+drop_ind = np.where(np.logical_or(loss < 100, loss>30000))
+data_known.drop(drop_ind[0], axis=0, inplace=True)
+loss = loss[keep_ind]
+
 # submit data
-data_submit = pd.read_csv('test.csv')
+data_submit = pd.read_csv('https://github.com/srhumir/kaggle-regression/raw/master/test.csv')
 submit_id = data_submit['id']
 data_submit.drop('id', axis=1, inplace=True)
 
@@ -47,7 +53,7 @@ data_known_dummy = data_dummy.iloc[:known_rows,:]
 data_submit_dummy= data_dummy.iloc[known_rows:,:]
 del(data_dummy)
 X_train, X_test, loss_train, loss_test = ms.train_test_split(data_known_dummy, loss, test_size = .1, random_state=0)
-X_val, X_test, loss_val, loss_test = ms.train_test_split(X_test, loss_test, test_size = .20, random_state=0)
+X_val, X_test, loss_val, loss_test = ms.train_test_split(X_test, loss_test, test_size = .10, random_state=0)
 #X_val2, X_test, loss_val2, loss_test = ms.train_test_split(X_test, loss_test, test_size = .66, random_state=0)
 #X_val3, X_test, loss_val3, loss_test = ms.train_test_split(X_test, loss_test, test_size = .5, random_state=0)
 #==============================================================================
@@ -227,8 +233,8 @@ rf.fit(train_data, loss_train)
 
 # Neural network
 import theano
-theano.config.openmp_elemwise_minsize=250
-OMP_NUM_THREADS=60
+theano.config.openmp_elemwise_minsize=10
+OMP_NUM_THREADS=4
 theano.config.openmp = True
 from keras.models import Sequential
 from keras.layers import Dense
@@ -256,15 +262,15 @@ np.random.seed(seed)
 kfold = ms.KFold(n_splits=10, random_state=seed)
 
 #results = cross_val_score(estimator, X, Y, cv=kfold)
-epo = 20
+epo = 400
 nn = KerasRegressor(build_fn=nn_model, nb_epoch=epo, batch_size=10,
                            verbose=1) 
 t0_nn = time.time()
 history_nn = nn.fit(train_data, loss_train)#,
 #       validation_split=0.1)
 nn_time = (time.time()-t0_nn)/60
-start = 5
-plt.plot(range(start,epo), np.sqrt(history_nn.history['loss'][start:]))
+start = 300
+plt.plot(range(start,epo), (history_nn.history['loss'][start:]))
 
 print(metrics.mean_absolute_error(loss_train, nn.predict(train_data)))
 print(metrics.mean_absolute_error(loss_test, nn.predict(test_data)))
@@ -285,9 +291,9 @@ t_boost = (time.time()-t0)/60
 # submit
 train_submit = data_submit_dummy.iloc[:,impvars]
 train_submit = std.transform(train_submit)
-loss_submit = boost_nn.predict(train_submit)
+loss_submit = nn.predict(train_submit)
 to_submit= pd.DataFrame({'id': submit_id, 'loss' : loss_submit})
-to_submit.to_csv('submitboost2.csv', index=False)
+to_submit.to_csv('submitnn_no_outlier800epo.csv', index=False)
 
 
 

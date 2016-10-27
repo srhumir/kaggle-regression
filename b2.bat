@@ -15,7 +15,12 @@ sudo yum install gcc-c++
 sudo yum install git
 sudo rm Anaconda3-4.2.0-Linux-x86_64.sh
 git init
-git remote add origin "https://github.com/srhumir/aws-upload"
-git pull https://github.com/srhumir/aws-upload
+git remote add origin https://github.com/srhumir/aws2
+git pull https://github.com/srhumir/aws2
+git config user.email "srh.umir@gmail.com"
+git config user.name "Reza"
+git add -A
+git commit -m "initiate"
 git push --set-upstream origin master
 git config --global credential.helper 'cache --timeout 72000'
+git config --global push.default simple
