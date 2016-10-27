@@ -130,7 +130,7 @@ for i in range(1,no_steps+1):
 	# submit
 	loss_submit = boost_nn.predict(train_submit)
 	to_submit= pd.DataFrame({'id': submit_id, 'loss' : loss_submit})
-	to_submit.to_csv('submitboost_noout;ier'+str(i*train_steps)+'estimators'+'.csv', index=False)
+	to_submit.to_csv('submitboost_nooutlier'+str(i*train_steps)+'estimators'+'.csv', index=False)
 	!git add -A
 	!git commit -m "result"
 	!git push
